@@ -3,7 +3,7 @@ const func1 = () => {
 }
 
 const loh2 = () => {
-    console.log("nelohnesssloh")
+    console.log("nelohneloh")
 }
 
 const aaaa = 2
