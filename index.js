@@ -6,4 +6,6 @@ const loh2 = () => {
     console.log("nelohneloh")
 }
 
+const b = 10
+
 const aaaa = 2
