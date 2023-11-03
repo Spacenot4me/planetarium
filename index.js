@@ -5,3 +5,5 @@ const func1 = () => {
 const loh2 = () => {
     console.log("nelohneloh")
 }
+
+const aaaa = 2
