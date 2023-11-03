@@ -8,4 +8,4 @@ const loh2 = () => {
 
 const bbb = 2
 
-
+loh1 = 555
