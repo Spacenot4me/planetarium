@@ -1,6 +1,7 @@
 import './App.css';
 import {useEffect, useRef, useState} from "react";
 import * as THREE from "three";
+import {gsap} from 'gsap';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import starsTexture from './images/stars.jpg';
 import sunTexture from './images/sun.jpg';
@@ -15,6 +16,7 @@ import uranusTexture from './images/uranus.jpg';
 import uranusRingTexture from './images/uranus ring.png';
 import neptuneTexture from './images/neptune.jpg';
 import plutoTexture from './images/pluto.jpg';
+import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import {Object3D} from "three";
 import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
 import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
@@ -30,11 +32,24 @@ function App() {
         //params
         const WIDTH = 1800; // window.innerWidth
         const HEIGHT = 920; // window.innerHeight
+        const params = {
+            threshold: 0,
+            strength: 0.4,
+            radius: 0.3,
+            exposure: 1,
+            x: 0,
+            y: 110,
+            z: 305,
+            rotX: -Math.PI/6,
+            rotY: 0,
+            rotZ: Math.PI/30
+        };
+
+
 
         // renderer
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(WIDTH, HEIGHT);
-        // document.body.appendChild(renderer.domElement);
         refContainer.current.appendChild(renderer.domElement);
 
 
@@ -58,34 +73,55 @@ function App() {
             0.1,
             1500
         );
-        camera.position.set(-90, 100, 140);
+        camera.position.set(params.x, params.y, params.z);
         camera.layers.enable(1);
 
+        const gui = new GUI();
+        gui.add(camera.position, 'x', -500,500).step(5);
+        gui.add(camera.position, 'y', -500,500).step(5);
+        gui.add(camera.position, 'z', -5000,5000).step(5);
+        gui.add(camera.rotation, 'x', -Math.PI,Math.PI).step(Math.PI/360);
+        gui.add(camera.rotation, 'y', -Math.PI,Math.PI).step(Math.PI/360);
+        gui.add(camera.rotation, 'z', -Math.PI,Math.PI).step(Math.PI/360);
 
-        //composer
-        const renderScene = new RenderPass(scene, camera);
-        const composer = new EffectComposer(renderer);
-        composer.addPass(renderScene);
-        const bloomPass = new UnrealBloomPass(
-            new THREE.Vector2(WIDTH, HEIGHT),
-            1.6,
-            0.1,
-            0.1
-        );
-        composer.addPass(bloomPass);
+
+        function defaultCameraPosition(){
+
+            gsap.to(camera.rotation, {
+                x: -Math.PI/6,
+                z: Math.PI/30,
+                y: 0,
+                duration: 1
+            })
+
+            gsap.to(camera.position, {
+                x: 0,
+                z: 110,
+                y: 305,
+                duration: 1
+            })
+
+            console.log(camera)
+
+        }
+        defaultCameraPosition();
+
 
 
         //orbit controls
         const controls = new OrbitControls(camera, renderer.domElement);
-        controls.minPolarAngle = Math.PI * 0.3;
-        controls.maxPolarAngle = Math.PI * 0.5;
+        controls.minPolarAngle = Math.PI * 0;
+        controls.maxPolarAngle = Math.PI * 0.35;
+        controls.maxDistance = 400;
         controls.addEventListener('start', () => {
-            renderer.setAnimationLoop(animateUserControls)
+            renderer.setAnimationLoop(animateUserControls);
         });
         controls.addEventListener('end', () => {
-            renderer.setAnimationLoop(animateDef)
+            renderer.setAnimationLoop(animateDef);
+            defaultCameraPosition();
+
         });
-        controls.update();
+        controls.target = new THREE.Vector3(0,-70,0);
 
 
         //light
@@ -111,6 +147,101 @@ function App() {
         ////////////
 
 
+
+        const BLOOM_SCENE = 1;
+
+        const bloomLayer = new THREE.Layers();
+        bloomLayer.set( BLOOM_SCENE );
+
+
+
+        const darkMaterial = new THREE.MeshBasicMaterial( { color: 'black' } );
+        const materials = {};
+
+        const renderScene = new RenderPass( scene, camera );
+
+        const bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
+        bloomPass.threshold = params.threshold;
+        bloomPass.strength = params.strength;
+        bloomPass.radius = params.radius;
+
+        const bloomComposer = new EffectComposer( renderer );
+        bloomComposer.renderToScreen = false;
+        bloomComposer.addPass( renderScene );
+        bloomComposer.addPass( bloomPass );
+
+        const mixPass = new ShaderPass(
+            new THREE.ShaderMaterial( {
+                uniforms: {
+                    baseTexture: { value: null },
+                    bloomTexture: { value: bloomComposer.renderTarget2.texture }
+                },
+                vertexShader: document.getElementById( 'vertexshader' ).textContent,
+                fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+                defines: {}
+            } ), 'baseTexture'
+        );
+        mixPass.needsSwap = true;
+
+        const outputPass = new OutputPass();
+
+        const finalComposer = new EffectComposer( renderer );
+        finalComposer.addPass( renderScene );
+        finalComposer.addPass( mixPass );
+        finalComposer.addPass( outputPass );
+
+
+
+        const bloomFolder = gui.addFolder( 'bloom' );
+
+        bloomFolder.add( params, 'threshold', 0.0, 1.0 ).onChange( function ( value ) {
+
+            bloomPass.threshold = Number( value );
+            render();
+
+        } );
+
+        bloomFolder.add( params, 'strength', 0.0, 3 ).onChange( function ( value ) {
+
+            bloomPass.strength = Number( value );
+            render();
+
+        } );
+
+        bloomFolder.add( params, 'radius', 0.0, 1.0 ).step( 0.01 ).onChange( function ( value ) {
+
+            bloomPass.radius = Number( value );
+            render();
+
+        } );
+
+
+
+        function render() {
+            scene.traverse( darkenNonBloomed );
+            bloomComposer.render();
+            scene.traverse( restoreMaterial );
+            // render the entire scene, then render bloom scene on top
+            finalComposer.render();
+        }
+
+        function darkenNonBloomed( obj ) {
+            if ( obj.isMesh && bloomLayer.test( obj.layers ) === false ) {
+                materials[ obj.uuid ] = obj.material;
+                obj.material = darkMaterial;
+            }
+        }
+
+        function restoreMaterial( obj ) {
+            if ( materials[ obj.uuid ] ) {
+                obj.material = materials[ obj.uuid ];
+                delete materials[ obj.uuid ];
+            }
+        }
+
+
+
+
         // planets create
         function createPlanet(name, size, texture, position, ring) {
             const geo = new THREE.SphereGeometry(size, 30, 30);
@@ -120,9 +251,15 @@ function App() {
             const mesh = new THREE.Mesh(geo, mat);
             mesh.name = name;
 
+            const orbitGeo = new THREE.TorusGeometry( position, 0.1, 16, 100 );
+            const orbitMat = new THREE.MeshBasicMaterial( { color: 0xffff00 } );
+            const orbit = new THREE.Mesh( orbitGeo, orbitMat );
+            orbit.rotateX(Math.PI / 2)
+
             const obj = new THREE.Object3D();
             obj.name = name;
             obj.add(mesh);
+            obj.add(orbit);
 
             if (ring) {
                 const ringGeo = new THREE.RingGeometry(
@@ -165,10 +302,11 @@ function App() {
 
 
         // planets orbits
-        const geometry = new THREE.TorusGeometry( 80, 0.1, 16, 100 );
-        const material = new THREE.MeshBasicMaterial( { color: 0xffff00 } );
-        const torus = new THREE.Mesh( geometry, material );
-        scene.add( torus );
+        // const geometry = new THREE.TorusGeometry( 80, 0.1, 16, 100 );
+        // const material = new THREE.MeshBasicMaterial( { color: 0xffff00 } );
+        // const torus = new THREE.Mesh( geometry, material );
+        // torus.rotateX(Math.PI / 2)
+        // scene.add( torus );
 
 
 
@@ -180,8 +318,12 @@ function App() {
         function getMouseVector2(event, window) {
             let mousePointer = new THREE.Vector2()
 
-            mousePointer.x = (event.clientX / WIDTH) * 2 - 1;
-            mousePointer.y = -(event.clientY / HEIGHT) * 2 + 1;
+            let rect = renderer.domElement.getBoundingClientRect();
+            mousePointer.x = ( ( event.clientX - rect.left ) / ( rect.width - rect.left ) ) * 2 - 1;
+            mousePointer.y = - ( ( event.clientY - rect.top ) / ( rect.bottom - rect.top) ) * 2 + 1;
+
+            // mousePointer.x = (event.clientX / WIDTH) * 2 - 1;
+            // mousePointer.y = -(event.clientY / HEIGHT) * 2 + 1;
 
             return mousePointer;
         }
@@ -216,7 +358,10 @@ function App() {
             if (intersections !== undefined) {
                 setPlanetTitle(intersections.object.name.toUpperCase())
                 for (const planet of planets) {
-                    if (planet === intersections.object.name) continue;
+                    if (planet === intersections.object.name) {
+                        eval(planet).obj.children.map(child => child.material.opacity = 1);
+                        continue;
+                    }
                     eval(planet).obj.children.map(child => child.material.opacity = 0.1);
                 }
             } else {
@@ -274,8 +419,7 @@ function App() {
             neptune.obj.rotateY(0.0001 / speed);
             pluto.obj.rotateY(0.00007 / speed);
 
-            // renderer.render(scene, camera);
-            composer.render();
+            render();
         }
 
         function animateUserControls() {
@@ -291,7 +435,7 @@ function App() {
             neptune.mesh.rotateY(0.032);
             pluto.mesh.rotateY(0.008);
 
-            composer.render();
+            render();
         }
 
         renderer.setAnimationLoop(animateDef);
@@ -314,18 +458,19 @@ function App() {
 
 
     return (
-        <div style={{
-            minHeight: '100vh',
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            flexDirection: "column"
-        }}>
-            <h1 >SkyWalker</h1>
-            <hr style={{marginBottom: '15px'}}/>
-            <div ref={refContainer}></div>
-            <hr style={{marginTop: '15px'}}/>
-        </div>
+        // <div style={{
+        //     minHeight: '100vh',
+        //     display: "flex",
+        //     justifyContent: "center",
+        //     alignItems: "center",
+        //     flexDirection: "column"
+        // }}>
+        //     <h1 >SkyWalker</h1>
+        //     <hr style={{marginBottom: '15px'}}/>
+        //
+        //     <hr style={{marginTop: '15px'}}/>
+        // </div>
+        <div ref={refContainer}></div>
 
     );
 }
