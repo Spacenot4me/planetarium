@@ -94,13 +94,6 @@ function App() {
                 duration: 1
             })
 
-            gsap.to(camera.position, {
-                x: 0,
-                z: 110,
-                y: 305,
-                duration: 1
-            })
-
             console.log(camera)
 
         }
