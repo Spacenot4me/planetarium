@@ -16,7 +16,7 @@ import uranusTexture from './images/uranus.jpg';
 import uranusRingTexture from './images/uranus ring.png';
 import neptuneTexture from './images/neptune.jpg';
 import plutoTexture from './images/pluto.jpg';
-import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+import {GUI} from 'three/addons/libs/lil-gui.module.min.js';
 import {Object3D} from "three";
 import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
 import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
@@ -28,10 +28,13 @@ function App() {
     const [planetTitle, setPlanetTitle] = useState('');
 
     const refContainer = useRef(null);
+
     useEffect(() => {
         //params
-        const WIDTH = 1800; // window.innerWidth
-        const HEIGHT = 920; // window.innerHeight
+        const WIDTH = (window.innerWidth/100)*95; // window.innerWidth - 120
+        const HEIGHT = (window.innerHeight/100)*85; // window.innerHeight - 160
+        console.log(window.innerWidth)
+        console.log(window.innerHeight)
         const params = {
             threshold: 0,
             strength: 0.4,
@@ -40,11 +43,10 @@ function App() {
             x: 0,
             y: 110,
             z: 305,
-            rotX: -Math.PI/6,
+            rotX: -Math.PI / 6,
             rotY: 0,
-            rotZ: Math.PI/30
+            rotZ: Math.PI / 30
         };
-
 
 
         // renderer
@@ -77,44 +79,77 @@ function App() {
         camera.layers.enable(1);
 
         const gui = new GUI();
-        gui.add(camera.position, 'x', -500,500).step(5);
-        gui.add(camera.position, 'y', -500,500).step(5);
-        gui.add(camera.position, 'z', -5000,5000).step(5);
-        gui.add(camera.rotation, 'x', -Math.PI,Math.PI).step(Math.PI/360);
-        gui.add(camera.rotation, 'y', -Math.PI,Math.PI).step(Math.PI/360);
-        gui.add(camera.rotation, 'z', -Math.PI,Math.PI).step(Math.PI/360);
+        gui.add(camera.position, 'x', -500, 500).step(5);
+        gui.add(camera.position, 'y', -500, 500).step(5);
+        gui.add(camera.position, 'z', -5000, 5000).step(5);
+        gui.add(camera.rotation, 'x', -Math.PI, Math.PI).step(Math.PI / 360);
+        gui.add(camera.rotation, 'y', -Math.PI, Math.PI).step(Math.PI / 360);
+        gui.add(camera.rotation, 'z', -Math.PI, Math.PI).step(Math.PI / 360);
 
 
-        function defaultCameraPosition(){
+        function defaultCameraPosition() {
 
-            gsap.to(camera.rotation, {
-                x: -Math.PI/6,
-                z: Math.PI/30,
-                y: 0,
-                duration: 1
-            })
+            // gsap.to(camera.rotation, {
+            //     x: -Math.PI / 6,
+            //     z: Math.PI / 30,
+            //     y: 0,
+            //     duration: 1
+            // })
 
-            console.log(camera)
-
+            gsap.to( camera.position, {
+                x: 0,
+                y: 110,
+                z: 305,
+                duration: 1,
+                onUpdate:function () {
+                    camera.lookAt(0, -70, 0)
+                }
+            });
         }
+
         defaultCameraPosition();
 
 
 
+
         //orbit controls
+        let timerCount = 3;
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.minPolarAngle = Math.PI * 0;
         controls.maxPolarAngle = Math.PI * 0.35;
         controls.maxDistance = 400;
+        controls.target = new THREE.Vector3(0, -70, 0);
         controls.addEventListener('start', () => {
+            timerCount = 3;
             renderer.setAnimationLoop(animateUserControls);
         });
+        controls.addEventListener('change', () => {
+            timerCount = 3;
+        })
         controls.addEventListener('end', () => {
             renderer.setAnimationLoop(animateDef);
-            defaultCameraPosition();
+            console.log('end end end end end end end end end end')
+
+            const timer = setInterval(function() {
+                timerCount--;
+                if (timerCount === 0) {
+                    clearInterval(timer);
+
+                }
+            }, 1000);
+
 
         });
-        controls.target = new THREE.Vector3(0,-70,0);
+
+
+
+
+
+
+
+        gui.add(controls.target, 'x', -500, 500).step(1);
+        gui.add(controls.target, 'y', -500, 500).step(1);
+        gui.add(controls.target, 'z', -500, 500).step(1);
 
 
         //light
@@ -140,99 +175,93 @@ function App() {
         ////////////
 
 
-
         const BLOOM_SCENE = 1;
 
         const bloomLayer = new THREE.Layers();
-        bloomLayer.set( BLOOM_SCENE );
+        bloomLayer.set(BLOOM_SCENE);
 
 
-
-        const darkMaterial = new THREE.MeshBasicMaterial( { color: 'black' } );
+        const darkMaterial = new THREE.MeshBasicMaterial({color: 'black'});
         const materials = {};
 
-        const renderScene = new RenderPass( scene, camera );
+        const renderScene = new RenderPass(scene, camera);
 
-        const bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
         bloomPass.threshold = params.threshold;
         bloomPass.strength = params.strength;
         bloomPass.radius = params.radius;
 
-        const bloomComposer = new EffectComposer( renderer );
+        const bloomComposer = new EffectComposer(renderer);
         bloomComposer.renderToScreen = false;
-        bloomComposer.addPass( renderScene );
-        bloomComposer.addPass( bloomPass );
+        bloomComposer.addPass(renderScene);
+        bloomComposer.addPass(bloomPass);
 
         const mixPass = new ShaderPass(
-            new THREE.ShaderMaterial( {
+            new THREE.ShaderMaterial({
                 uniforms: {
-                    baseTexture: { value: null },
-                    bloomTexture: { value: bloomComposer.renderTarget2.texture }
+                    baseTexture: {value: null},
+                    bloomTexture: {value: bloomComposer.renderTarget2.texture}
                 },
-                vertexShader: document.getElementById( 'vertexshader' ).textContent,
-                fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+                vertexShader: document.getElementById('vertexshader').textContent,
+                fragmentShader: document.getElementById('fragmentshader').textContent,
                 defines: {}
-            } ), 'baseTexture'
+            }), 'baseTexture'
         );
         mixPass.needsSwap = true;
 
         const outputPass = new OutputPass();
 
-        const finalComposer = new EffectComposer( renderer );
-        finalComposer.addPass( renderScene );
-        finalComposer.addPass( mixPass );
-        finalComposer.addPass( outputPass );
+        const finalComposer = new EffectComposer(renderer);
+        finalComposer.addPass(renderScene);
+        finalComposer.addPass(mixPass);
+        finalComposer.addPass(outputPass);
 
 
+        const bloomFolder = gui.addFolder('bloom');
 
-        const bloomFolder = gui.addFolder( 'bloom' );
+        bloomFolder.add(params, 'threshold', 0.0, 1.0).onChange(function (value) {
 
-        bloomFolder.add( params, 'threshold', 0.0, 1.0 ).onChange( function ( value ) {
-
-            bloomPass.threshold = Number( value );
+            bloomPass.threshold = Number(value);
             render();
 
-        } );
+        });
 
-        bloomFolder.add( params, 'strength', 0.0, 3 ).onChange( function ( value ) {
+        bloomFolder.add(params, 'strength', 0.0, 3).onChange(function (value) {
 
-            bloomPass.strength = Number( value );
+            bloomPass.strength = Number(value);
             render();
 
-        } );
+        });
 
-        bloomFolder.add( params, 'radius', 0.0, 1.0 ).step( 0.01 ).onChange( function ( value ) {
+        bloomFolder.add(params, 'radius', 0.0, 1.0).step(0.01).onChange(function (value) {
 
-            bloomPass.radius = Number( value );
+            bloomPass.radius = Number(value);
             render();
 
-        } );
-
+        });
 
 
         function render() {
-            scene.traverse( darkenNonBloomed );
+            scene.traverse(darkenNonBloomed);
             bloomComposer.render();
-            scene.traverse( restoreMaterial );
+            scene.traverse(restoreMaterial);
             // render the entire scene, then render bloom scene on top
             finalComposer.render();
         }
 
-        function darkenNonBloomed( obj ) {
-            if ( obj.isMesh && bloomLayer.test( obj.layers ) === false ) {
-                materials[ obj.uuid ] = obj.material;
+        function darkenNonBloomed(obj) {
+            if (obj.isMesh && bloomLayer.test(obj.layers) === false) {
+                materials[obj.uuid] = obj.material;
                 obj.material = darkMaterial;
             }
         }
 
-        function restoreMaterial( obj ) {
-            if ( materials[ obj.uuid ] ) {
-                obj.material = materials[ obj.uuid ];
-                delete materials[ obj.uuid ];
+        function restoreMaterial(obj) {
+            if (materials[obj.uuid]) {
+                obj.material = materials[obj.uuid];
+                delete materials[obj.uuid];
             }
         }
-
-
 
 
         // planets create
@@ -244,10 +273,11 @@ function App() {
             const mesh = new THREE.Mesh(geo, mat);
             mesh.name = name;
 
-            const orbitGeo = new THREE.TorusGeometry( position, 0.1, 16, 100 );
-            const orbitMat = new THREE.MeshBasicMaterial( { color: 0xffff00 } );
-            const orbit = new THREE.Mesh( orbitGeo, orbitMat );
-            orbit.rotateX(Math.PI / 2)
+            const orbitGeo = new THREE.TorusGeometry(position, 0.1, 16, 100);
+            const orbitMat = new THREE.MeshBasicMaterial({color: 0xffff00});
+            const orbit = new THREE.Mesh(orbitGeo, orbitMat);
+            orbit.name = name;
+            orbit.rotateX(Math.PI / 2);
 
             const obj = new THREE.Object3D();
             obj.name = name;
@@ -302,8 +332,6 @@ function App() {
         // scene.add( torus );
 
 
-
-
         // detect intersection
         let mousePointer = new THREE.Vector2();
         const raycaster = new THREE.Raycaster();
@@ -312,9 +340,10 @@ function App() {
             let mousePointer = new THREE.Vector2()
 
             let rect = renderer.domElement.getBoundingClientRect();
-            mousePointer.x = ( ( event.clientX - rect.left ) / ( rect.width - rect.left ) ) * 2 - 1;
-            mousePointer.y = - ( ( event.clientY - rect.top ) / ( rect.bottom - rect.top) ) * 2 + 1;
-
+            mousePointer.x = ((event.clientX - rect.left) / (rect.width)) * 2 - 1;
+            mousePointer.y = -((event.clientY - rect.top) / (rect.height)) * 2 + 1;
+            // mousePointer.x = ((event.clientX - rect.left) / (rect.width - rect.left)) * 2 - 1;
+            // mousePointer.y = -((event.clientY - rect.top) / (rect.bottom - rect.top)) * 2 + 1;
             // mousePointer.x = (event.clientX / WIDTH) * 2 - 1;
             // mousePointer.y = -(event.clientY / HEIGHT) * 2 + 1;
 
@@ -434,9 +463,11 @@ function App() {
         renderer.setAnimationLoop(animateDef);
 
 
+
+
         window.addEventListener('resize', function () {
-            const width = WIDTH;
-            const height = HEIGHT;
+            const width =  (window.innerWidth/100)*95; // window.innerWidth - 120
+            const height = (window.innerHeight/100)*85; // window.innerHeight - 160
 
             camera.aspect = width / height;
             camera.updateProjectionMatrix();
@@ -446,24 +477,22 @@ function App() {
             renderer.render(scene, camera);
         });
 
-
     }, []);
 
-
     return (
-        // <div style={{
-        //     minHeight: '100vh',
-        //     display: "flex",
-        //     justifyContent: "center",
-        //     alignItems: "center",
-        //     flexDirection: "column"
-        // }}>
-        //     <h1 >SkyWalker</h1>
-        //     <hr style={{marginBottom: '15px'}}/>
-        //
-        //     <hr style={{marginTop: '15px'}}/>
-        // </div>
-        <div ref={refContainer}></div>
+        <div style={{
+            minHeight: '100vh',
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            flexDirection: "column"
+        }}>
+            <h1>SkyWalker</h1>
+            <hr/>
+            <div ref={refContainer}></div>
+            <hr/>
+        </div>
+
 
     );
 }
